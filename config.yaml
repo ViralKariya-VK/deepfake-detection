@@ -1,0 +1,23 @@
+# config.yaml
+
+environment: local          # "local" or "colab"
+
+paths:
+  # Local (M4 Mac) — each teammate sets their own
+  local_data_root: "/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake"
+  
+  # Colab (shared via Drive — same for both)
+  colab_data_root: ""
+
+preprocessing:
+  face_size: 224
+  detector: "retinaface"    # or "mtcnn"
+
+model:
+  encoder: "dino_vits8"
+  embedding_dim: 384
+
+training:
+  batch_size: 32
+  epochs: 20
+  learning_rate: 0.0001
