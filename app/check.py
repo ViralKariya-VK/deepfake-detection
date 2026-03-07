@@ -5,14 +5,13 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from preprocessing.face_detector import FaceDetector
+from preprocessing.vidoes_to_frame import DatasetProcessor
 
-IMAGE_PATH = 'app/sample_data/000001.jpg'
+processor = DatasetProcessor(
+    celeba_root="/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive",
+    output_dir="output/celeba_aligned",
+    output_size=224
+)
 
-detector = FaceDetector()
-image = detector.load_image(IMAGE_PATH)
-results = detector.detect(image)
-
-print(f"Faces Found: {len(results)}")
-for r in results:
-    print(r['box'], r['confidence'])
+# Test on 50 images first
+processor.process_celeba(limit=50)
