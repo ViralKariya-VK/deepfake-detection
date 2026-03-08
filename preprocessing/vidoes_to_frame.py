@@ -64,7 +64,7 @@ class DatasetProcessor:
         if limit:
             train_images = train_images[:limit]
 
-        success, failure = 0, 0
+        success, failed = 0, 0
 
         for image_id in tqdm(train_images, desc="Processing CelebA Dataset"):
             image_path = os.path.join(self.images_dir, image_id)
@@ -94,4 +94,4 @@ class DatasetProcessor:
                 failed += 1
                 continue
 
-        print(f"\nDone. Succes: {success} | Failed: {failure}")
+        print(f"\nDone. Succes: {success} | Failed: {failed}")
