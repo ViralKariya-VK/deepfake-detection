@@ -1,0 +1,21 @@
+image,true_label,anomaly_score,decision,correct
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive/img_align_celeba/img_align_celeba/000001.jpg,REAL,0.696,FAKE,False
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive/img_align_celeba/img_align_celeba/000002.jpg,REAL,0.249,REAL,True
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive/img_align_celeba/img_align_celeba/000003.jpg,REAL,0.628,FAKE,False
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive/img_align_celeba/img_align_celeba/000004.jpg,REAL,0.221,REAL,True
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive/img_align_celeba/img_align_celeba/000005.jpg,REAL,0.17,REAL,True
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive/img_align_celeba/img_align_celeba/000006.jpg,REAL,0.172,REAL,True
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive/img_align_celeba/img_align_celeba/000007.jpg,REAL,0.7,FAKE,False
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive/img_align_celeba/img_align_celeba/000008.jpg,REAL,0.315,REAL,True
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive/img_align_celeba/img_align_celeba/000009.jpg,REAL,0.658,FAKE,False
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/raw/celeba/archive/img_align_celeba/img_align_celeba/000010.jpg,REAL,0.103,REAL,True
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/deepfake_photos_for-testing/image-1.jpeg,FAKE,0.0,REAL,False
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/deepfake_photos_for-testing/image-2.jpeg,FAKE,0.246,REAL,False
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/deepfake_photos_for-testing/image-3.jpeg,FAKE,0.155,REAL,False
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/deepfake_photos_for-testing/image-4.jpeg,FAKE,0.309,REAL,False
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/deepfake_photos_for-testing/image-5.jpeg,FAKE,0.871,FAKE,True
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/deepfake_photos_for-testing/image-6.jpeg,FAKE,1.0,FAKE,True
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/deepfake_photos_for-testing/image-7.jpeg,FAKE,0.041,REAL,False
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/deepfake_photos_for-testing/image-8.jpeg,FAKE,0.284,REAL,False
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/deepfake_photos_for-testing/image-9.jpeg,FAKE,0.559,FAKE,True
+/Users/viral/NMIMS/2. Sem-II/2. UML/Project/project-DeepFake/data/deepfake_photos_for-testing/image-10.jpeg,FAKE,0.233,REAL,False

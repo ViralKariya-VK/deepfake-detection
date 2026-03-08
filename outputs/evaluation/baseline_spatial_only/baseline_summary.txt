@@ -1,0 +1,42 @@
+
+BASELINE EVALUATION — SPATIAL BRANCH ONLY
+==========================================
+Date:             2026-03-08 14:15
+Model:            DINO ViT-S/8 + Isolation Forest
+Training data:    CelebA 10k real faces
+Test set:         10 real (CelebA) + 10 fake (StyleGAN / thispersondoesnotexist.com)
+Threshold:        0.5
+
+RESULTS
+──────────────────────────────────────────
+Overall accuracy: 45.0%  (9/20 correct)
+Real faces:       6/10 correctly identified
+Fake faces:       3/10 correctly identified
+
+Mean real score:  0.391
+Mean fake score:  0.370
+Score separation: -0.021  (positive = good, negative = bad)
+
+ANALYSIS
+──────────────────────────────────────────
+- Spatial branch alone is insufficient against StyleGAN generated faces
+- StyleGAN faces are semantically convincing at the embedding level
+- DINO embeddings + Isolation Forest cannot distinguish high quality
+  synthetic faces from real faces reliably at this training scale
+- Mean fake score LOWER than mean real score indicates the model
+  is not yet separating distributions correctly
+
+WHY THIS IS EXPECTED
+──────────────────────────────────────────
+1. StyleGAN is the hardest possible test — generates photorealistic faces
+2. Only 10k training images — manifold boundary is not tight enough
+3. Spatial embeddings alone miss pixel level artifacts
+4. No temporal signal yet — vPPG branch not integrated
+
+WHAT WILL IMPROVE THIS
+──────────────────────────────────────────
+1. Autoencoder — adds pixel level reconstruction error signal
+2. Full 160k CelebA training — tighter real face manifold
+3. FaceForensics++ test set — face swaps have clearer artifacts
+4. Temporal branch (vPPG) — physiological signal catches StyleGAN fakes
+5. Fusion of all signals — no single branch needs to be perfect
