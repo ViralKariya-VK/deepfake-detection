@@ -1,128 +1,92 @@
 import cv2
-import numpy as np
-import sys
 import os
-from retinaface import RetinaFace
+from tqdm import tqdm
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATASET_PATH = "datasets/Celeb-DF-v2/Celeb-real"
+OUTPUT_PATH = "outputs/faces"
 
-TARGET_FPS = 15
-MIN_FRAMES = 30
-MIN_CONFIDENCE = 0.9
+TARGET_FPS = 10  
+FACE_SIZE = 224
 
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 
-def _get_sample_indices(native_fps: float, total_frames: int) -> list[int]:
-    step = native_fps / TARGET_FPS
-    indices = np.arange(0, total_frames, step).astype(int)
+face_cascade = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+)
 
-    indices = indices[indices < total_frames]
-    return indices.tolist()
+def extract_faces(video_path):
 
-
-def _detect_best_face(frame_rgb: np.ndarray) -> list[int] | None:
-    faces = RetinaFace.detect_faces(frame_rgb)
-
-    if not isinstance(faces, dict):
-        return None
-    
-    best_box = None
-    best_score = -1.0
-
-    for key, face_data in faces.items():
-        score = face_data["score"]
-
-        if score <  MIN_CONFIDENCE:
-            continue
-        if score > best_score:
-            best_score = score
-            best_box = face_data["facial_area"]     # [x1, y1, x2, y2]
-
-    return best_box
-
-
-def _crop_face(frame_rgb: np.ndarray, box: list[int]) -> np.ndarray:
-    h, w = frame_rgb.shape[:2]
-    x1, y1, x2, y2 = box
-
-    pad_x = int((x2 - x1) * 0.10)
-    pad_y = int((y2 - y1) * 0.10)
-
-    x1 = max(0, x1 - pad_x)
-    y1 = max(0, y1 - pad_y)
-    x2 = min(w, x2 + pad_x)
-    y2 = min(h, y2 + pad_y)
-
-    return frame_rgb[y1:y2, x1:x2]
-
-
-
-def process_video(video_path: str) -> tuple:
+    video_name = os.path.basename(video_path).split(".")[0]
+    save_dir = os.path.join(OUTPUT_PATH, video_name)
+    os.makedirs(save_dir, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        print(f"[video_processor] ERROR: Cannot open video: {video_path}")
-        return None, None
 
-    native_fps = cap.get(cv2.CAP_PROP_FPS)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    video_fps = cap.get(cv2.CAP_PROP_FPS)
 
-    if native_fps <= 0 or total_frames <= 0:
-        print(f"[video_processor] ERROR: Invalid video metadata (fps={native_fps}, frames={total_frames})")
-        cap.release()
-        return None, None
+    frame_interval = max(int(video_fps / TARGET_FPS), 1)
 
-    print(f"[video_processor] Video opened: {os.path.basename(video_path)}")
-    print(f"[video_processor] Native FPS: {native_fps:.1f} | Total frames: {total_frames}")
+    frame_count = 0
+    saved_count = 0
 
+    while True:
 
-    sample_indices = _get_sample_indices(native_fps, total_frames)
-    print(f"[video_processor] Sampling {len(sample_indices)} frames at {TARGET_FPS}fps")
-
-    face_crops = []
-    frames_no_face = 0
-
-    for idx in sample_indices:
-        
-        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ret, frame_bgr = cap.read()
+        ret, frame = cap.read()
 
         if not ret:
-            continue   
+            break
 
-        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-
-        box = _detect_best_face(frame_rgb)
-        if box is None:
-            frames_no_face += 1
+        if frame_count % frame_interval != 0:
+            frame_count += 1
             continue
 
-        crop = _crop_face(frame_rgb, box)
-        face_crops.append(crop)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        faces = face_cascade.detectMultiScale(
+            gray,
+            scaleFactor=1.2,
+            minNeighbors=5,
+            minSize=(80, 80)
+        )
+
+        for (x, y, w, h) in faces:
+
+            margin = int(0.2 * h)
+
+            x1 = max(0, x - margin)
+            y1 = max(0, y - margin)
+
+            x2 = min(frame.shape[1], x + w + margin)
+            y2 = min(frame.shape[0], y + h + margin)
+
+            face = frame[y1:y2, x1:x2]
+
+            if face.size == 0:
+                continue
+
+            face = cv2.resize(face, (FACE_SIZE, FACE_SIZE))
+
+            save_path = os.path.join(save_dir, f"{saved_count}.jpg")
+
+            cv2.imwrite(save_path, face)
+
+            saved_count += 1
+
+        frame_count += 1
 
     cap.release()
 
-    print(f"[video_processor] Frames with face: {len(face_crops)} | Skipped (no face): {frames_no_face}")
-    if len(face_crops) < MIN_FRAMES:
-        print(f"[video_processor] ERROR: Not enough face frames ({len(face_crops)} < {MIN_FRAMES}). Video too short or face not detected.")
-        return None, None
 
-    print(f"[video_processor] Done. Returning {len(face_crops)} face crops at {TARGET_FPS}fps.")
-    return face_crops, float(TARGET_FPS)
+def process_dataset():
+
+    videos = [v for v in os.listdir(DATASET_PATH) if v.endswith(".mp4")]
+
+    for video in tqdm(videos):
+
+        video_path = os.path.join(DATASET_PATH, video)
+
+        extract_faces(video_path)
 
 
 if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) < 2:
-        print("Usage: python video_processor.py path/to/video.mp4")
-        sys.exit(1)
-
-    test_path = sys.argv[1]
-    crops, fps = process_video(test_path)
-
-    if crops is not None:
-        print(f"\n✓ Success: {len(crops)} face crops extracted")
-        print(f"✓ FPS passed downstream: {fps}")
-        print(f"✓ First crop shape: {crops[0].shape}")   # Should be (H, W, 3)
-    else:
-        print("\n✗ process_video returned None — check errors above")
+    process_dataset()
