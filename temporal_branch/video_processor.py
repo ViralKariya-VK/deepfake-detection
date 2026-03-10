@@ -1,92 +1,160 @@
 import cv2
+import numpy as np
+import sys
 import os
-from tqdm import tqdm
+import mediapipe as mp
 
-DATASET_PATH = "datasets/Celeb-DF-v2/Celeb-real"
-OUTPUT_PATH = "outputs/faces"
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-TARGET_FPS = 10  
-FACE_SIZE = 224
+TARGET_FPS = 15
+MIN_FRAMES = 30
+MIN_CONFIDENCE = 0.7
 
-os.makedirs(OUTPUT_PATH, exist_ok=True)
 
-face_cascade = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-)
+mp_face_detection = mp.solutions.face_detection
+face_detector = mp_face_detection.FaceDetection(model_selection = 1, min_detection_confidence = MIN_CONFIDENCE)
 
-def extract_faces(video_path):
 
-    video_name = os.path.basename(video_path).split(".")[0]
-    save_dir = os.path.join(OUTPUT_PATH, video_name)
-    os.makedirs(save_dir, exist_ok=True)
+def _get_sample_indices(native_fps: float, total_frames: int) -> list[int]:
+    step = native_fps / TARGET_FPS
+    indices = np.arange(0, total_frames, step).astype(int)
 
-    cap = cv2.VideoCapture(video_path)
+    indices = indices[indices < total_frames]
+    return indices.tolist()
 
-    video_fps = cap.get(cv2.CAP_PROP_FPS)
 
-    frame_interval = max(int(video_fps / TARGET_FPS), 1)
+def _detect_best_face(frame_rgb: np.ndarray) -> list[int] | None:
+    h, w = frame_rgb.shape[:2]
 
-    frame_count = 0
-    saved_count = 0
+    results = face_detector.process(frame_rgb)
 
-    while True:
+    if not results.detections:
+        return None
+    
+    best_box = None
+    best_score = -1.0
 
-        ret, frame = cap.read()
+    for detection in results.detections:
+        score = detection.score[0]
 
-        if not ret:
-            break
-
-        if frame_count % frame_interval != 0:
-            frame_count += 1
+        if score < MIN_CONFIDENCE:
             continue
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        if score > best_score:
+            best_score = score
 
-        faces = face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=1.2,
-            minNeighbors=5,
-            minSize=(80, 80)
-        )
+            bbox = detection.location_data.relative_bounding_box
 
-        for (x, y, w, h) in faces:
+            x1 = int(bbox.xmin * w)
+            y1 = int(bbox.ymin * h)
+            x2 = int((bbox.xmin + bbox.width) * w)
+            y2 = int((bbox.ymin + bbox.height) * h)
 
-            margin = int(0.2 * h)
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(w, x2)
+            y2 = min(h, y2)
 
-            x1 = max(0, x - margin)
-            y1 = max(0, y - margin)
+            best_box = [x1, y1, x2, y2]
 
-            x2 = min(frame.shape[1], x + w + margin)
-            y2 = min(frame.shape[0], y + h + margin)
+    return best_box
 
-            face = frame[y1:y2, x1:x2]
 
-            if face.size == 0:
-                continue
+def _crop_face(frame_rgb: np.ndarray, box: list[int]) -> np.ndarray:
+    h, w = frame_rgb.shape[:2]
+    x1, y1, x2, y2 = box
 
-            face = cv2.resize(face, (FACE_SIZE, FACE_SIZE))
+    pad_x = int((x2 - x1) * 0.10)
+    pad_y = int((y2 - y1) * 0.10)
 
-            save_path = os.path.join(save_dir, f"{saved_count}.jpg")
+    x1 = max(0, x1 - pad_x)
+    y1 = max(0, y1 - pad_y)
+    x2 = min(w, x2 + pad_x)
+    y2 = min(h, y2 + pad_y)
 
-            cv2.imwrite(save_path, face)
+    return frame_rgb[y1:y2, x1:x2]
 
-            saved_count += 1
 
-        frame_count += 1
+def process_video(video_path: str) -> tuple:
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"[video_processor] ERROR: Cannot open video: {video_path}")
+        return None, None
+
+    native_fps   = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    if native_fps <= 0 or total_frames <= 0:
+        print(f"[video_processor] ERROR: Invalid video metadata "
+              f"(fps={native_fps}, frames={total_frames})")
+        cap.release()
+        return None, None
+
+    print(f"[video_processor] Video opened : {os.path.basename(video_path)}")
+    print(f"[video_processor] Native FPS   : {native_fps:.1f} | "
+          f"Total frames: {total_frames}")
+
+    sample_indices = _get_sample_indices(native_fps, total_frames)
+    print(f"[video_processor] Sampling {len(sample_indices)} frames "
+          f"at {TARGET_FPS}fps")
+
+    face_crops     = []
+    frames_no_face = 0
+
+    for idx in sample_indices:
+        
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame_bgr = cap.read()
+
+        if not ret:
+            continue 
+
+        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+
+        box = _detect_best_face(frame_rgb)
+        if box is None:
+            frames_no_face += 1
+            continue
+
+        crop = _crop_face(frame_rgb, box)
+
+        if crop.size == 0:
+            frames_no_face += 1
+            continue
+
+        face_crops.append(crop)
 
     cap.release()
 
+    print(f"[video_processor] Frames with face : {len(face_crops)} | "
+          f"Skipped (no face): {frames_no_face}")
 
-def process_dataset():
+    if len(face_crops) < MIN_FRAMES:
+        print(f"[video_processor] ERROR: Not enough face frames "
+              f"({len(face_crops)} < {MIN_FRAMES}). "
+              f"Video too short or face not detected.")
+        return None, None
 
-    videos = [v for v in os.listdir(DATASET_PATH) if v.endswith(".mp4")]
+    print(f"[video_processor] Done. Returning {len(face_crops)} "
+          f"face crops at {TARGET_FPS}fps.")
 
-    for video in tqdm(videos):
-
-        video_path = os.path.join(DATASET_PATH, video)
-
-        extract_faces(video_path)
+    return face_crops, float(TARGET_FPS)
 
 
 if __name__ == "__main__":
-    process_dataset()
+
+    if len(sys.argv) < 2:
+        print("Usage: python video_processor.py path/to/video.mp4")
+        sys.exit(1)
+
+    test_path = sys.argv[1]
+    crops, fps = process_video(test_path)
+
+    if crops is not None:
+        print(f"\n✓ Success: {len(crops)} face crops extracted")
+        print(f"✓ FPS passed downstream : {fps}")
+        print(f"✓ First crop shape      : {crops[0].shape}")  # (H, W, 3)
+        print(f"✓ All crops have data   : {all(c.size > 0 for c in crops)}")
+    else:
+        print("\n✗ process_video returned None — check errors above")
