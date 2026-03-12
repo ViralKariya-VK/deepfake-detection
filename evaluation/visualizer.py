@@ -80,8 +80,8 @@ def visualize_embeddings(embeddings_dir, output_dir, perplexity=30):
     # t-SNE works best on a sample for large datasets
     # For 10k+ subsamples 5000 to keep it fast
 
-    if len(embeddings) > 5000:
-        idx = np.random.choice(len(embeddings), 5000, replace=False)
+    if len(embeddings) > 100000:
+        idx = np.random.choice(len(embeddings), 100000, replace=False)
         embeddings = embeddings[idx]
         print(f"Subsampled to 5000 embeddings for t-SNE")
 
