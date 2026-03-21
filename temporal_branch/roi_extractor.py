@@ -6,6 +6,8 @@ import mediapipe as mp
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+MIN_VALID_FRAMES = 30
+
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
     static_image_mode = True,
@@ -27,15 +29,8 @@ def _landmarks_to_rect(
     frame_w: int
 ) -> list[int]:
     
-    xs = []
-    ys = []
-
-    for idx in landmark_indices:
-        lm = landmarks[idx]
-        x = int(lm.x * frame_w)
-        y = int(lm.y * frame_h)
-        xs.append(x)
-        ys.append(y)
+    xs = [int(landmarks[i].x * frame_w) for i in landmark_indices]
+    ys = [int(landmarks[i].y * frame_h) for i in landmark_indices]
 
     x1, y1 = min(xs), min(ys)
     x2, y2 = max(xs), max(ys)
@@ -75,17 +70,16 @@ def _save_debug_frame(
 
     vis = cv2.cvtColor(crop.copy(), cv2.COLOR_RGB2BGR)
 
-    def draw(rect, color):
+    for rect, color in [
+        (forehead_rect, (0, 255, 0)),
+        (left_rect, (255, 0, 0)),
+        (right_rect, (0, 0, 255))
+    ]:
+    
         x1, y1, x2, y2 = rect
         cv2.rectangle(vis, (x1, y1), (x2, y2), color, 2)
-
-    draw(forehead_rect, (0, 255, 0))    # Green  = forehead
-    draw(left_rect,     (255, 0, 0))    # Blue   = left cheek
-    draw(right_rect,    (0, 0, 255))    # Red    = right cheek
-
-    save_path = os.path.join(debug_dir, f"frame_{frame_idx:04d}.jpg")
-    cv2.imwrite(save_path, vis)
-    print(f"[roi_extractor] Debug frame saved: {save_path}")
+    
+    cv2.imwrite(os.path.join(debug_dir, f"{frame_idx:04d}.jpg"), vis)
 
 
 def extract_roi_signals(
@@ -97,15 +91,11 @@ def extract_roi_signals(
     rgb_signals = []
     failed_frames = 0
     debug_dir = os.path.join(os.getcwd(), "debug_roi")
-
     debug_saved = 0
     DEBUG_MAX = 5
 
-    print(f"[roi_extractor] Processing {len(face_crops)} face crops")
-
     for i, crop in enumerate(face_crops):
         h, w = crop.shape[:2]
-
         results = face_mesh.process(crop)
 
         if not results.multi_face_landmarks:
@@ -127,8 +117,7 @@ def extract_roi_signals(
             failed_frames += 1
             continue
 
-        mean_rgb = np.mean([forehead_rgb, left_rgb, right_rgb], axis=0)
-        rgb_signals.append(mean_rgb)
+        rgb_signals.append(np.mean([forehead_rgb, left_rgb, right_rgb], axis=0))
 
         if debug and debug_saved < DEBUG_MAX:
             _save_debug_frame(
@@ -137,49 +126,13 @@ def extract_roi_signals(
             )
             debug_saved += 1
 
-    print(f"[roi_extractor] Valid frames         : {len(rgb_signals)} | "
-          f"Failed (no landmarks): {failed_frames}")
+    print(f"[roi_extractor] Valid frames={len(rgb_signals)} | "
+          f"Failed={failed_frames}")
     
-    if len(rgb_signals) < 30:
+    if len(rgb_signals) < MIN_VALID_FRAMES:
         print(f"[roi_extractor] ERROR: Not enough valid frames "
-              f"({len(rgb_signals)} < 30). Cannot extract vPPG signal.")
+              f"({len(rgb_signals)} < {MIN_VALID_FRAMES})")
         return None, None
 
-    rgb_array = np.array(rgb_signals)   # shape (N, 3)
-    print(f"[roi_extractor] Done. rgb_signals shape: {rgb_array.shape}")
+    return np.array(rgb_signals), fps
 
-    return rgb_array, fps
-
-
-if __name__ == "__main__":
-    import sys
-    from video_processor import process_video
-
-    if len(sys.argv) < 2:
-        print("Usage: python roi_extractor.py path/to/video.mp4")
-        sys.exit(1)
-
-    test_path = sys.argv[1]
-
-    print("=" * 50)
-    print("STEP 1: video_processor")
-    print("=" * 50)
-    crops, fps = process_video(test_path)
-
-    if crops is None:
-        print("✗ video_processor failed — check errors above")
-        sys.exit(1)
-
-    print("\n" + "=" * 50)
-    print("STEP 2: roi_extractor")
-    print("=" * 50)
-    rgb_signals, fps = extract_roi_signals(crops, fps, debug=True)
-
-    if rgb_signals is not None:
-        print(f"\n✓ Success: rgb_signals shape : {rgb_signals.shape}")
-        print(f"✓ FPS passed downstream      : {fps}")
-        print(f"✓ Sample values (frame 0)    : R={rgb_signals[0,0]:.2f}  "
-              f"G={rgb_signals[0,1]:.2f}  B={rgb_signals[0,2]:.2f}")
-        print(f"✓ Debug frames saved to      : debug_roi/")
-    else:
-        print("\n✗ extract_roi_signals returned None — check errors above")

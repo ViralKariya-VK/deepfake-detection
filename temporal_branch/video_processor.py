@@ -45,15 +45,10 @@ def _detect_best_face(frame_rgb: np.ndarray) -> list[int] | None:
 
             bbox = detection.location_data.relative_bounding_box
 
-            x1 = int(bbox.xmin * w)
-            y1 = int(bbox.ymin * h)
-            x2 = int((bbox.xmin + bbox.width) * w)
-            y2 = int((bbox.ymin + bbox.height) * h)
-
-            x1 = max(0, x1)
-            y1 = max(0, y1)
-            x2 = min(w, x2)
-            y2 = min(h, y2)
+            x1 = max(0, int(bbox.xmin * w))
+            y1 = max(0, int(bbox.ymin * h))
+            x2 = min(w, int((bbox.xmin + bbox.width) * w))
+            y2 = min(h, int((bbox.ymin + bbox.height) * h))
 
             best_box = [x1, y1, x2, y2]
 
@@ -91,14 +86,10 @@ def process_video(video_path: str) -> tuple:
         cap.release()
         return None, None
 
-    print(f"[video_processor] Video opened : {os.path.basename(video_path)}")
-    print(f"[video_processor] Native FPS   : {native_fps:.1f} | "
-          f"Total frames: {total_frames}")
+    print(f"[video_processor] {os.path.basename(video_path)} | " 
+          f"fps={native_fps:.0f} | frames={total_frames}")
 
     sample_indices = _get_sample_indices(native_fps, total_frames)
-    print(f"[video_processor] Sampling {len(sample_indices)} frames "
-          f"at {TARGET_FPS}fps")
-
     face_crops     = []
     frames_no_face = 0
 
@@ -111,8 +102,8 @@ def process_video(video_path: str) -> tuple:
             continue 
 
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-
         box = _detect_best_face(frame_rgb)
+
         if box is None:
             frames_no_face += 1
             continue
@@ -127,34 +118,12 @@ def process_video(video_path: str) -> tuple:
 
     cap.release()
 
-    print(f"[video_processor] Frames with face : {len(face_crops)} | "
-          f"Skipped (no face): {frames_no_face}")
+    print(f"[video_processor] faces={len(face_crops)} | "
+          f"Skipped={frames_no_face}")
 
     if len(face_crops) < MIN_FRAMES:
         print(f"[video_processor] ERROR: Not enough face frames "
-              f"({len(face_crops)} < {MIN_FRAMES}). "
-              f"Video too short or face not detected.")
+              f"({len(face_crops)} < {MIN_FRAMES}). ")
         return None, None
 
-    print(f"[video_processor] Done. Returning {len(face_crops)} "
-          f"face crops at {TARGET_FPS}fps.")
-
     return face_crops, float(TARGET_FPS)
-
-
-if __name__ == "__main__":
-
-    if len(sys.argv) < 2:
-        print("Usage: python video_processor.py path/to/video.mp4")
-        sys.exit(1)
-
-    test_path = sys.argv[1]
-    crops, fps = process_video(test_path)
-
-    if crops is not None:
-        print(f"\n✓ Success: {len(crops)} face crops extracted")
-        print(f"✓ FPS passed downstream : {fps}")
-        print(f"✓ First crop shape      : {crops[0].shape}")  # (H, W, 3)
-        print(f"✓ All crops have data   : {all(c.size > 0 for c in crops)}")
-    else:
-        print("\n✗ process_video returned None — check errors above")
